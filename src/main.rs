@@ -3,6 +3,71 @@ use bevy::{
     window::*,
 };
 
+#[derive(Component, Default)]
+struct Velocity(Vec2);
+
+#[derive(Component, Default)]
+enum Direction {
+    #[default]
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+#[derive(Component, Default)]
+struct Player{}
+
+#[derive(Bundle, Default)]
+struct PlayerBundle {
+    player: Player,
+    velocity: Velocity,
+    direction: Direction,
+    sprite: SpriteBundle
+}
+
+fn move_entity(
+    time: Res<Time>,
+    mut entity_position: Query<(&mut Transform, &Velocity)>
+) {
+    for (mut pos, vel) in &mut entity_position {
+        pos.translation += vel.0.extend(0.) * time.delta_seconds();
+    }
+}
+
+fn player_input(
+    keyboard: Res<Input<KeyCode>>,
+    mut player_data: Query<(&mut Velocity, &mut Direction, With<Player>)>
+) {
+    for (mut vel, mut dir, _) in &mut player_data {
+        vel.0 = Vec2::ZERO;
+        
+        const SPEED: f32 = 150.;
+    
+        if keyboard.pressed(KeyCode::W) {
+            vel.0.y += 1.;
+            *dir = Direction::Up;
+        }
+
+        if keyboard.pressed(KeyCode::A) {
+            vel.0.x -= 1.;
+            *dir = Direction::Left;
+        }
+
+        if keyboard.pressed(KeyCode::S) {
+            vel.0.y -= 1.;
+            *dir = Direction::Down;
+        }
+
+        if keyboard.pressed(KeyCode::D) {
+            vel.0.x += 1.;
+            *dir = Direction::Right;
+        }
+
+        vel.0 = vel.0.normalize_or_zero() * SPEED;
+    }
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -16,66 +81,40 @@ fn main() {
             ..default()
         }))
         .add_startup_system(setup)
-        .add_system(sprite_movement)
+        .add_system(player_input)
+        .add_system(move_entity)
         .run();
 }
 
-#[derive(Component)]
-enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-}
+
 
 fn setup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
-    commands.spawn((
-        SpriteBundle {
-            sprite: Sprite{
+    commands.spawn(PlayerBundle {
+        velocity: Velocity(Vec2::ZERO),
+        direction: Direction::Up,
+        sprite: SpriteBundle{
+            sprite: Sprite {
                 custom_size: Some(Vec2{ x: 10.0, y: 10.0}),
                 color: Color::rgb(0.4, 0.7, 0.3),
                 ..default()
             },
-            transform: Transform::from_xyz(100., 0., 0.),
+            transform: Transform::from_xyz(50., 50., 0.),
+            ..default()
+        },
+        ..default()
+    });
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite{
+                custom_size: Some(Vec2{ x: 10.0, y: 10.0}),
+                color: Color::rgb(0.4, 0.9, 0.3),
+                ..default()
+            },
+            transform: Transform::from_xyz(125., 125., 0.),
             ..default()
         },
         Direction::Up,
     ));
 }
 
-fn sprite_movement(
-    time: Res<Time>,
-    keyboard: Res<Input<KeyCode>>,
-    mut sprite_position: Query<(&mut Direction, &mut Transform)>
-) {
-    const SPEED: f32 = 150.;
-    let mut movement: Vec2 = Vec2::ZERO;
-    
-    for (mut dir, mut transform) in &mut sprite_position {
-        if keyboard.pressed(KeyCode::W) {
-            movement.y += 1.;
-            *dir = Direction::Up;
-        }
-
-        if keyboard.pressed(KeyCode::A) {
-            movement.x -= 1.;
-            *dir = Direction::Left;
-        }
-
-        if keyboard.pressed(KeyCode::S) {
-            movement.y -= 1.;
-            *dir = Direction::Down;
-        }
-
-        if keyboard.pressed(KeyCode::D) {
-            movement.x += 1.;
-            *dir = Direction::Right;
-        }
-
-        let norm = movement.normalize_or_zero();
-        let mvmt = norm * SPEED;
-
-        transform.translation += mvmt.extend(0.) * time.delta_seconds();
-    }
-}
